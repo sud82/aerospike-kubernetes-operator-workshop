@@ -1,0 +1,71 @@
+
+apiVersion: aerospike.com/v1alpha1
+kind: AerospikeCluster
+metadata:
+  name: aerocluster
+  namespace: aerospike
+
+spec:
+  size: 2
+  image: aerospike/aerospike-server-enterprise:5.4.0.5
+
+  multiPodPerHost: true
+
+  storage:
+    filesystemVolumePolicy:
+      cascadeDelete: true
+      initMethod: deleteFiles
+    volumes:
+      - path: /opt/aerospike
+        storageClass: ssd
+        volumeMode: filesystem
+        sizeInGB: 1
+
+  aerospikeAccessControl:
+    users:
+      - name: admin
+        secretName: auth-secret
+        roles:
+          - sys-admin
+          - user-admin
+          - read-write
+
+  aerospikeConfigSecret:
+    secretName: aerospike-secret
+    mountPath:  /etc/aerospike/secret
+
+  aerospikeConfig:
+    logging:
+      - name: /var/log/aerospike/aerospike.log
+        any: info
+
+    service:
+      feature-key-file: /etc/aerospike/secret/features.conf
+
+    security:
+      enable-security: true
+
+    namespaces:
+      - name: test
+        memory-size: 1000000000
+        replication-factor: 2
+        storage-engine:
+          type: memory
+
+  resources:
+    requests:
+      memory: 2Gi
+      cpu: 200m
+
+  podSpec:
+    sidecars:
+      - name: aerospike-prometheus-exporter
+        image: aerospike/aerospike-prometheus-exporter:1.1.6
+        ports:
+        - containerPort: 9145
+          name: exporter
+        env:
+        - name: AS_AUTH_USER
+          value: admin
+        - name: AS_AUTH_PASSWORD
+          value: admin123

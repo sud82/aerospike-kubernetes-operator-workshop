@@ -13,16 +13,17 @@ This repo provides step by step guide to deploy aerospike-kubernetes-operator an
     + [**Connect to the cluster**](#connect-to-the-cluster)
   * [**Add monitoring**](#add-monitoring)
     + [**Pre-Requisites**](#pre-requisites)
-    + [**Add sidecar in aerospike_cluster_cr.yaml**](#add-sidecar-in-aerospike-cluster-cryaml)
+    + [**Add sidecar in aerospike_cluster.yaml**](#add-sidecar-in-aerospike-clusteryaml)
     + [**Deploy Monitoring Stack**](#deploy-monitoring-stack)
     + [**View Dashboards**](#view-dashboards)
-  * [**Scale up/down**](#scale-up-down)
+  * [**Scale up**](#scale-up)
+  * [**Scale down**](#scale-down)
   * [**Upgrade**](#upgrade)
   * [**Update config**](#update-config)
+  * [**Rolling back partial Upgrade/Config update or scale down**](#rolling-back-partial-upgrade-config-update-or-scale-down)
   * [**Rack management**](#rack-management)
     + [**Add/Remove racks**](#add-remove-racks)
     + [**Cluster node distribution in racks**](#cluster-node-distribution-in-racks)
-    + [**Setting rack lavel storage and aerospikeConfig**](#setting-rack-lavel-storage-and-aerospikeconfig)
   * [**Access control management**](#access-control-management)
     + [**Creating a role**](#creating-a-role)
     + [**Creating a user with roles**](#creating-a-user-with-roles)
@@ -31,12 +32,11 @@ This repo provides step by step guide to deploy aerospike-kubernetes-operator an
     + [**Deploy destination cluter**](#deploy-destination-cluter)
     + [**Deploy source cluster**](#deploy-source-cluster)
 
-
 # **Workshop**
 
 ## **Create a Kubernetes cluster**
 
-To use the Aerospike Kubernetes Operator, you will need a working Kubernetes cluster with version 1.16, 1.17 or 1.18.
+To use the Aerospike Kubernetes Operator, you will need a working Kubernetes cluster with version 1.16, 1.17, or 1.18.
 
 If you need to set up a new cluster: [See here for official guides](https://kubernetes.io/docs/setup/production-environment/)
 
@@ -48,16 +48,13 @@ There are specific guides for:
 
 ## **Get the operator and prerequisite files from git**
 
-Download the Aerospike Operator package [here](https://github.com/aerospike/aerospike-kubernetes-operator/tree/1.0.0/deploy/), and unpack it on the same computer where you normally run kubectl. The Operator package contains contains the CRDs and other resource files necessary to deploy the operator along with sample Aerospike cluster deployment resource files.
+Download the Aerospike Operator package [here](https://github.com/aerospike/aerospike-kubernetes-operator/tree/1.0.0/deploy/), and unpack it on the same computer where you normally run kubectl. The Operator package contains the CRDs and other resource files necessary to deploy the operator along with sample Aerospike cluster deployment resource files.
 
 ```sh
 # To clone the Aerospike Github Operator repository
 git clone https://github.com/aerospike/aerospike-kubernetes-operator.git
 cd aerospike-kubernetes-operator
 git checkout 1.0.0
-
-# Create work dir to create this workshop related files
-mkdir workshop
 ```
 
 The `deploy` folder has the prerequisite files.
@@ -66,10 +63,6 @@ The `deploy` folder has the prerequisite files.
 
 ### **Prerequisites**
 
-  - Create a new `Kubernetes namespace`. This will help in putting all Aerospike related resource in a single logical space
-  - Register `Aerospike CRD` [aerospike.com_aerospikeclusters_crd.yaml](https://github.com/aerospike/aerospike-kubernetes-operator/tree/1.0.0/deploy/crds/aerospike.com_aerospikeclusters_crd.yaml)
-  - Setup [Role based access control (`RBAC`)](https://kubernetes.io/docs/reference/access-authn-authz/rbac/). RBAC helps in regulating access to the Kubernetes cluster and its resources based on the roles of individual users within your organization.
-
 ```sh
 # Create a new Kubernetes namespace.
 kubectl create namespace aerospike
@@ -77,13 +70,11 @@ kubectl create namespace aerospike
 # Register Aerospike CRD
 kubectl apply -f deploy/crds/aerospike.com_aerospikeclusters_crd.yaml
 
-# Setup RBAC
+# Setup RBAC. Helps in regulating access to the Kubernetes cluster and its resources based on the roles of individual users within your organization
 kubectl apply -f deploy/rbac.yaml
 ```
 
 ### **Deploy the Operator**
-
-Aerospike Kubernetes Operator can be deployed by applying [deploy/operator.yaml](https://github.com/aerospike/aerospike-kubernetes-operator/tree/1.0.0/deploy/operator.yaml) file. 
 
 ```sh
 # Deploy the Operator
@@ -141,23 +132,21 @@ For MicroK8s
 kubectl apply -f deploy/samples/storage/microk8s_filesystem_storage_class.yaml
 ```
 
-See [Storage Provisioning](Storage-provisioning) for more details on configuring persistent storage.
-
 **Create secrets**
 
-Create secrets to setup Aerospike authentication, TLS, and features.conf. See [[Manage-TLS-Certificates]] for more details.
+Create secrets to set up Aerospike authentication, TLS, and features.conf.
 
 Aerospike secrets like `TLS certificates, security credentials, and features.conf` can be packaged in a single directory and converted to Kubernetes secrets
 
-> Operator only supports Enterprise Aerospike Clusters. Hence secret should have the `features.conf` file. Copy your features.conf in `deploy/secrets` and create the secret using given command.
+> Operator only supports Enterprise Aerospike Clusters. Hence secret should have the `features.conf` file. Copy your features.conf in `deploy/secrets` and create the secret using the given command.
 
 ```sh
 kubectl -n aerospike create secret generic aerospike-secret --from-file=deploy/secrets
 ```
 
-Create a secret containing the `password` for Aerospike cluster `admin user` by passing the password from the command line.
+Create a secret containing the `password` for the Aerospike cluster `admin user` by giving the password from the command line.
 
-> This is needed only if cluster is security enabled
+> This is needed only if the cluster is security enabled
 
 ```sh
 kubectl -n aerospike create secret generic auth-secret --from-literal=password='admin123'
@@ -165,12 +154,9 @@ kubectl -n aerospike create secret generic auth-secret --from-literal=password='
 
 **Create Aerospike cluster Custom Resource (CR)**
 
-Refer to the [[cluster configuration settings]] section for details on the Aerospike cluster custom resource (CR) file. Sample Aerospike cluster CR files for different configurations can be found [here](https://github.com/aerospike/aerospike-kubernetes-operator/tree/1.0.0/deploy/samples/).
+This custom resource file can be used to deploy the Aerospike cluster and edited later on to make any changes/manage the cluster.
 
-This custom resource file can be edited later on to make any changes/manage the Aerospike cluster.
-
-```sh
-echo '
+```yaml
 apiVersion: aerospike.com/v1alpha1
 kind: AerospikeCluster
 metadata:
@@ -241,16 +227,15 @@ spec:
           value: admin
         - name: AS_AUTH_PASSWORD
           value: admin123
-' > workshop/aerospike_cluster_cr.yaml
 ```
-
 
 ### **Deploy Aerospike cluster**
 
-Use the CR yaml file that you created to deploy an Aerospike cluster.
-
 ```sh
-kubectl apply -f workshop/aerospike_cluster_cr.yaml
+# Get custom resource files in operator dir
+cp -r ../workshop .
+
+kubectl apply -f workshop/aerospike_cluster.yaml
 
 # Verify cluster status
 # Check the pods to confirm the status. This step may take some time as the pod's provision resources, initialize, and are ready. Please wait for the pods to switch to the running state.
@@ -270,6 +255,8 @@ aerocluster-0-1                                  0/2     PodInitializing   0    
 aerocluster-0-0                                  0/2     PodInitializing   0          16s
 aerocluster-0-0                                  2/2     Running           0          17s
 aerocluster-0-1                                  2/2     Running           0          17s
+.
+.
 
 ```
 
@@ -280,11 +267,9 @@ aerocluster-0-1                                  2/2     Running           0    
 
 When the Aerospike cluster is deployed in a `single pod per Kubernetes host mode`, ports `3000 (service port)` and `4333 (TLS port)` on all Kubernetes hosts should be accessible to all client and tools.
 
-When the Aerospike cluster is configured to have `multiple pods per Kubernetes host mode`, port-range `(30000–32767)` on all Kubernetes hosts should be accessible to all client and tools.
+When the Aerospike cluster is configured to have `multiple pods per Kubernetes host mode`, port-range `(30000–32767)` on all Kubernetes hosts should be accessible to all clients and tools.
 
 Configure the `firewall rules` for the Kubernetes cluster accordingly.
-
-Also see [[Cluster-configuration-settings]] file for the use of `multiPodPerHost` setting.
 
 **Obtain the Aerospike node endpoints**
 
@@ -335,8 +320,6 @@ Status:
 
 When connecting from outside the Kubernetes cluster network, you need to use the host external IPs. By default, the Operator configures access endpoints to use Kubernetes host internal IPs and alternate access endpoints to use host external IPs.
 
-Please refer to [network policy](Configuration#network-policy) configuration for details.
-
 From the example status output, for pod aerocluster-0-0, the alternate access endpoint is 34.70.193.192:31312
 
 With kubectl
@@ -373,7 +356,9 @@ sudo apt-get install helm
 
 For more details - https://helm.sh/docs/intro/install/
 
-### **Add sidecar in aerospike_cluster_cr.yaml**
+### **Add sidecar in aerospike_cluster.yaml**
+
+>**Note: Skip this step if podSpec is already added in CR**
 
 ```yaml
 apiVersion: aerospike.com/v1alpha1
@@ -407,7 +392,7 @@ spec:
 **Apply the change**
 
 ```sh
-kubectl apply -f workshop/aerospike_cluster_cr.yaml
+kubectl apply -f workshop/aerospike_cluster.yaml
 
 kubectl get pods -n aerospike -w
 
@@ -429,12 +414,11 @@ As a minimal configuration, let’s configure Prometheus to discover our Aerospi
 
 See serviceDiscovery section in the below `aerospike_monitoring_stack.yaml` file.
 
-This will let Prometheus discover exporter targets from aerospike namespace, pod labels with app: aerospike-cluster, container port name as exporter. Notice that the container port name exporter matches with what we specified in the podSpec.sidecars in aerospike_cluster_cr.yaml.
+This will let Prometheus discover exporter targets from aerospike namespace, pod labels with the app: aerospike-cluster, container port name as an exporter. Notice that the container port name exporter matches with what we specified in the podSpec.sidecars in aerospike_cluster.yaml.
 
 **aerospike_monitoring_stack.yaml**
 
-```sh
-echo '
+```yaml
 prometheus:
   # Service discovery (to discover exporter targets)
   serviceDiscovery:
@@ -462,7 +446,7 @@ global:
   scrape_interval:     5s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
   evaluation_interval: 5s # Evaluate rules every 15 seconds. The default is every 1 minute.
   # scrape_timeout is set to the global default (10s).
-' > workshop/aerospike_monitoring_stack.yaml
+
 ```
 
 
@@ -493,13 +477,13 @@ For Grafana dashboard,
 kubectl port-forward -n aerospike service/aerospike-monitoring-stack-grafana 3000:80
 ```
 
-Open http://localhost:3000 Log in to Grafana with default credentials : admin/admin
+Open http://localhost:3000 Log in to Grafana with default credentials: admin/admin
 
 > To uninstall the aerospike-monitoring-stack, run: ```helm uninstall aerospike-monitoring-stack --namespace aerospike```
 
-## **Scale up/down**
+## **Scale up**
 
-Change the `spec.size` field in the cr yaml file to scale up/down the cluster.
+Change the `spec.size` field in the cr yaml file to scale up the cluster.
 
 ```yaml
 apiVersion: aerospike.com/v1alpha1
@@ -516,7 +500,7 @@ spec:
 
 **Apply the change**
 ```sh
-kubectl apply -f workshop/aerospike_cluster_cr.yaml
+kubectl apply -f workshop/aerospike_cluster.yaml
 
 # Check the pods
 kubectl get pods -n aerospike -w
@@ -525,11 +509,41 @@ NAME                                             READY   STATUS    RESTARTS   AG
 aerocluster-0-0                                  2/2     Running   0          4m48s
 aerocluster-0-1                                  2/2     Running   0          5m27s
 aerocluster-0-2                                  2/2     Running   0          4m30s
-aerospike-kubernetes-operator-79775b6cbf-tv7nq   1/1     Running   0          39m
-aerospike-monitoring-stack-alertmanager-0        1/1     Running   0          11m
-aerospike-monitoring-stack-grafana-0             1/1     Running   0          11m
-aerospike-monitoring-stack-prometheus-0          1/1     Running   0          11m
+.
+.
 
+```
+
+## **Scale down**
+
+Change the `spec.size` field in the cr yaml file to scale down the cluster.
+
+```yaml
+apiVersion: aerospike.com/v1alpha1
+kind: AerospikeCluster
+metadata:
+  name: aerocluster
+  namespace: aerospike
+spec:
+  size: 2
+  image: aerospike/aerospike-server-enterprise:5.5.0.3
+  .
+  .
+```
+
+**Apply the change**
+```sh
+kubectl apply -f workshop/aerospike_cluster.yaml
+
+# Check the pods
+kubectl get pods -n aerospike -w
+
+NAME                                             READY   STATUS    RESTARTS   AGE
+aerocluster-0-0                                  2/2     Running   0          4m48s
+aerocluster-0-1                                  2/2     Running   0          5m27s
+aerocluster-0-2                                  2/2     Terminating   0          4m30s
+.
+.
 ```
 
 ## **Upgrade**
@@ -554,7 +568,7 @@ spec:
 **Apply the change**
 
 ```sh
-kubectl apply -f workshop/aerospike_cluster_cr.yaml
+kubectl apply -f workshop/aerospike_cluster.yaml
 
 # Check the pods
 # The pods will undergo a rolling restart.
@@ -567,9 +581,11 @@ aerocluster-0-2                                  2/2     Running   0          11
 aerocluster-0-2                                  2/2     Terminating   0          11m
 aerocluster-0-2                                  0/2     Terminating   0          11m
 aerocluster-0-2                                  0/2     Terminating   0          11m
+.
+.
 ```
 
-After all the pods have restarted, use kubectl describe to get the status of the cluster. Check `image` for all Pods in status.
+After all the pods have restarted, use kubectl describe for getting the status of the cluster. Check `image` for all Pods in status.
 
 ```sh
 kubectl -n aerospike describe aerospikecluster aerocluster
@@ -607,7 +623,7 @@ Status:
 
 Add an in-memory namespace `bar`. 
 
-Currently we do not allow a persistent storage namespace to be added dynamically due to Kubernetes related limitations.  
+Currently, we do not allow a persistent storage namespace to be added dynamically due to Kubernetes-related limitations.  
 
 ```yaml
 apiVersion: aerospike.com/v1alpha1
@@ -632,7 +648,7 @@ spec:
 **Apply the change**
 
 ```sh
-kubectl apply -f workshop/aerospike_cluster_cr.yaml
+kubectl apply -f workshop/aerospike_cluster.yaml
 
 # Check the pods
 # Pods will undergo a rolling restart.
@@ -645,14 +661,48 @@ aerocluster-0-2                                  2/2     Running   0          15
 aerocluster-0-2                                  2/2     Terminating   0          15m
 aerocluster-0-2                                  0/2     Terminating   0          15m
 aerocluster-0-2                                  0/2     Terminating   0          15m
+.
+.
 ```
+## **Rolling back partial Upgrade/Config update or scale down**
 
+Use case:
+  - Want to remove in-memory namespace `bar`.
+  - After it is removed from a few node's configs by doing a rolling restart of those nodes, you change your mind and want to roll back to the previous config.
+
+Steps to follow:
+  - Remove namespace `bar` from the config
+  - Apply the config using `kubectl apply -f workshop/aerospike_cluster.yaml` 
+  - Wait for few nodes to restart
+  - Add the namespace `bar` again in the config. Here, the cluster should just do the rolling restart of nodes, where namespace was removed in previous steps. It will not touch the nodes, which  already have the config with namespace `bar`
+  - Apply the config using `kubectl apply -f workshop/aerospike_cluster.yaml` 
+
+
+```yaml
+apiVersion: aerospike.com/v1alpha1
+kind: AerospikeCluster
+metadata:
+  name: aerocluster
+  namespace: aerospike
+spec:
+  size: 2
+  image: aerospike/aerospike-server-enterprise:5.5.0.3
+  aerospikeConfig:
+    namespaces:
+      - name: bar
+        memory-size: 1000000000
+        replication-factor: 2
+        storage-engine:
+          type: memory
+  .
+  .
+```
 
 ## **Rack management**
 
 ### **Add/Remove racks**
 
-Add the Rack specific config for the Aerospike cluster in CR file.
+Add the Rack-specific config for the Aerospike cluster in the CR file.
 
 ```yaml
   rackConfig:
@@ -672,7 +722,7 @@ Add the Rack specific config for the Aerospike cluster in CR file.
 **Apply the change**
 
 ```sh
-kubectl apply -f workshop/aerospike_cluster_cr.yaml
+kubectl apply -f workshop/aerospike_cluster.yaml
 
 # Check the pods
 # Pods will be moved to new racks. Pods will be divided equally across all the racks as far as possible.
@@ -682,11 +732,13 @@ NAME                                             READY   STATUS    RESTARTS   AG
 aerocluster-1-0                                  2/2     Running   0          7m49s
 aerocluster-1-1                                  2/2     Running   0          6m9s
 aerocluster-2-0                                  2/2     Running   0          7m42s
+.
+.
 ```
 
 ### **Cluster node distribution in racks**
 
-Cluster nodes are distributed across racks as evenly as possible. The cluster size is divided by the number of racks to get nodes per rack. If there are remainder nodes, they are distributed one by one across racks starting from first rack.
+Cluster nodes are distributed across racks as evenly as possible. The cluster size is divided by the number of racks to get nodes per rack. If there are remainder nodes, they are distributed one by one across racks starting from the first rack.
 
 For e.g.
 
@@ -697,31 +749,6 @@ Topology:
   - NodesForRack2: 3
   - NodesForRack3: 2
   - NodesForRack4: 2
-
-### **Setting rack lavel storage and aerospikeConfig**
-
-Rack also provide for setting local storage and aerospikeConfig. If local storage is given for rack then rack will use this storage otherwise common global storage will be used. Here aerospikeConfig is config patch which will be merged with common global aerospikeConfig and will be used for rack.
-
-```yaml
-  rackConfig:
-    namespaces:
-      - test
-    racks:
-      - id: 1
-        zone: us-central1-b
-        aerospikeConfig:
-          service:
-            proto-fd-max: 18000
-        storage:
-          filesystemVolumePolicy:
-            cascadeDelete: false
-            initMethod: deleteFiles
-          volumes:
-            - path: /opt/aerospike
-              storageClass: ssd
-              volumeMode: filesystem
-              sizeInGB: 3
-```
 
 ## **Access control management**
 
@@ -757,10 +784,10 @@ spec:
 **Apply the change**
 
 ```sh
-kubectl apply -f workshop/aerospike_cluster_cr.yaml
+kubectl apply -f workshop/aerospike_cluster.yaml
 ```
 
-**Check in AQL**
+**Validate in AQL**
 
 ```sh
 kubectl run -it --rm --restart=Never aerospike-tool -n aerospike --image=aerospike/aerospike-tools:latest -- aql -h aerocluster -U admin -P admin123
@@ -785,9 +812,9 @@ aql> show roles
 
 ### **Creating a user with roles**
 
-Create the secret for the user and add the user in `users` list under `aerospikeAccessControl`.
+Create the secret for the user and add the user to the `users` list under `aerospikeAccessControl`.
 
-Create a secret `profile-user-secret` containing the password for the user `profiler` by passing the password from the command line:
+Create a secret `profile-user-secret` containing the password for the user `profiler` by giving the password from the command line:
 
 ```sh
 kubectl -n aerospike create secret generic profile-user-secret --from-literal=password='userpass'
@@ -825,10 +852,10 @@ spec:
 **Apply the change**
 
 ```sh
-kubectl apply -f workshop/aerospike_cluster_cr.yaml
+kubectl apply -f workshop/aerospike_cluster.yaml
 ```
 
-**Check in AQL**
+**Validate in AQL**
 
 ```sh
 kubectl run -it --rm --restart=Never aerospike-tool -n aerospike --image=aerospike/aerospike-tools:latest -- aql -h aerocluster -U admin -P admin123
@@ -846,7 +873,7 @@ aql> show users
 
 ### **Changing a user's password**
 
-Create a new secret `new-profile-user-secret` containing the password for Aerospike cluster user `profileUser` by passing the password from the command line:
+Create a new secret `new-profile-user-secret` containing the password for Aerospike cluster user `profileUser` by giving the password from the command line:
 
 ```sh
 kubectl  -n aerospike create secret generic new-profile-user-secret --from-literal=password='newuserpass'
@@ -886,7 +913,7 @@ spec:
 **Apply the change**
 
 ```sh
-kubectl apply -f workshop/aerospike_cluster_cr.yaml
+kubectl apply -f workshop/aerospike_cluster.yaml
 ```
 
 **Connect to AQL using new User and Password**
@@ -907,13 +934,13 @@ aql>
 
 ## **Multicluster setup**
 
-We can make XDR setup using multicluster support in operator. Operator can manage multiple aerospike clusters, deployed in a single namespace or in multiple namespaces.
+We can make an XDR setup using multicluster support in the operator. The operator can manage multiple aerospike clusters, deployed in a single namespace or in multiple namespaces.
 
-Here we will deploy a source cluster and a destination cluster to create the XDR setup in the single kubernetes namespace.
+Here we will deploy a source cluster and a destination cluster to create the XDR setup in the single Kubernetes namespace.
 
 ### **Deploy destination cluter**
 
-We will use the existing cluster as Destination cluster and deploy another cluster as the source cluster. 
+We will use the existing cluster as a Destination cluster and deploy another cluster as the source cluster. 
 
 ### **Deploy source cluster**
 
@@ -925,23 +952,20 @@ Using existing storage class created earlier
 
 Using existing secrets created earlier. 
 
-> If destination cluster is security enabled then secret created in this section should also have  a credentials file  for destination DC
+> If destination cluster is security enabled then the secret created in this section should also have  a credentials file  for destination DC
 ```sh
 $ cat password_DC1.txt
-credentials
-{
-   username <dst_cluster_user>
-   password <dst_cluster_pass>
-}
+passwordOnDestination
+
 ```
 
-If existing secret doesn't have `password_DC1.txt` file then update that or create a new secret with this file.
+If the existing secret doesn't have the `password_DC1.txt` file then update that or create a new secret with this file.
 
-**XDR config to be used in source cluster cr file**
+**XDR config to be used in source cluster CR file**
 
 Two things needed for connecting to the destination DC are:
   - `node-address-ports` list of destination cluster pods
-  - `auth-password-file` is the credentials file  for destination DC. If destination cluster is security enabled then a credentials file for destination DC should be provided as a secret in `spec.aerospikeConfigSecret` and it's path should be mentioned here
+  - `auth-password-file` is the credentials file for destination DC. If the destination cluster is security enabled then a credentials file for destination DC should be provided as a secret in `spec.aerospikeConfigSecret` and its path should be mentioned here
 
 ```yaml
     xdr:
@@ -959,9 +983,7 @@ Two things needed for connecting to the destination DC are:
 
 **Deploy source cluster**
 
-```sh
-
-echo '
+```yaml
 apiVersion: aerospike.com/v1alpha1
 kind: AerospikeCluster
 metadata:
@@ -1043,11 +1065,11 @@ spec:
           value: admin
         - name: AS_AUTH_PASSWORD
           value: admin123
-' > workshop/xdr_src_cluster_cr.yaml
+
 ```
 
 ```sh
-kubectl apply -f workshop/xdr_src_cluster_cr.yaml
+kubectl apply -f workshop/xdr_src_cluster.yaml
 
 # Verify cluster status
 kubectl get pods -n aerospike -w
@@ -1058,6 +1080,8 @@ aerocluster-1-1                                  2/2     Running   0          20
 aerocluster-2-0                                  2/2     Running   0          22m
 aeroclustersrc-0-0                               1/1     Running   0          48s
 aeroclustersrc-0-1                               1/1     Running   0          48s
+.
+.
 
 ```
 
@@ -1089,5 +1113,5 @@ aql> select * from test
 
 ```
 
-> **Note**: Here Source and Destination clusters are deployed in a single namespace. If the user wants to deploy these clusters in different namespaces then the user has to follow [these](#multiple-aerospike-clusters-in-multiple-k8s-namespaces) steps.
+> **Note**: Here, Source and Destination clusters are deployed in a single k8s namespace. The operator can also deploy Aerospike clusters in multiple k8s namespaces.
 

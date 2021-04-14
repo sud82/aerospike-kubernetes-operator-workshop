@@ -1,0 +1,27 @@
+prometheus:
+  # Service discovery (to discover exporter targets)
+  serviceDiscovery:
+    # Namespace to look for targets
+    namespaces:
+      - aerospike
+    # Prometheus relabel configs
+    relabelConfigs:
+      - source_labels: [__meta_kubernetes_namespace]
+        separator: ;
+        regex: aerospike
+        replacement: $1
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        separator: ;
+        regex: aerospike-cluster
+        replacement: $1
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_container_port_name]
+        separator: ;
+        regex: exporter
+        replacement: $1
+        action: keep
+global:
+  scrape_interval:     5s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  evaluation_interval: 5s # Evaluate rules every 15 seconds. The default is every 1 minute.
+  # scrape_timeout is set to the global default (10s).
