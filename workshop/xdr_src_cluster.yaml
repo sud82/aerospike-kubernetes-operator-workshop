@@ -67,3 +67,16 @@ spec:
     requests:
       memory: 2Gi
       cpu: 200m
+      
+  podSpec:
+    sidecars:
+      - name: aerospike-prometheus-exporter
+        image: aerospike/aerospike-prometheus-exporter:1.1.6
+        ports:
+        - containerPort: 9145
+          name: exporter
+        env:
+        - name: AS_AUTH_USER
+          value: admin
+        - name: AS_AUTH_PASSWORD
+          value: admin123

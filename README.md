@@ -54,7 +54,7 @@ Download the Aerospike Operator package [here](https://github.com/aerospike/aero
 # To clone the Aerospike Github Operator repository
 git clone https://github.com/aerospike/aerospike-kubernetes-operator.git
 cd aerospike-kubernetes-operator
-git checkout 1.0.0
+git checkout 1.0.1
 ```
 
 The `deploy` folder has the prerequisite files.
@@ -96,7 +96,7 @@ Use the pod name obtained above to check the Operator logs.
 kubectl -n aerospike logs -f aerospike-kubernetes-operator-5587bc7758-psn5t
 ```
 ```
-t=2020-03-26T06:23:42+0000 lvl=info msg="Operator Version: 1.0.0" module=cmd caller=main.go:79
+t=2020-03-26T06:23:42+0000 lvl=info msg="Operator Version: 1.0.1" module=cmd caller=main.go:79
 t=2020-03-26T06:23:42+0000 lvl=info msg="Go Version: go1.13.4" module=cmd caller=main.go:80
 t=2020-03-26T06:23:42+0000 lvl=info msg="Go OS/Arch: linux/amd64" module=cmd caller=main.go:81
 t=2020-03-26T06:23:42+0000 lvl=info msg="Version of operator-sdk: v0.12.0+git" module=cmd caller=main.go:82
@@ -368,10 +368,7 @@ metadata:
   namespace: aerospike
 spec:
   size: 2
-  image: aerospike/aerospike-server-enterprise:5.2.0.7
-  multiPodPerHost: true
-.
-.
+
   podSpec:
     sidecars:
       - name: aerospike-prometheus-exporter
@@ -493,7 +490,6 @@ metadata:
   namespace: aerospike
 spec:
   size: 3
-  image: aerospike/aerospike-server-enterprise:5.5.0.3
   .
   .
 ```
@@ -526,7 +522,6 @@ metadata:
   namespace: aerospike
 spec:
   size: 2
-  image: aerospike/aerospike-server-enterprise:5.5.0.3
   .
   .
 ```
@@ -559,7 +554,6 @@ metadata:
   name: aerocluster
   namespace: aerospike
 spec:
-  size: 2
   image: aerospike/aerospike-server-enterprise:5.5.0.3
   .
   .
@@ -619,6 +613,19 @@ Status:
       Service Port:  31312
 ```
 
+## **Rolling back partial Upgrade/Config update or scale down**
+
+Use case:
+  - Want to upgrade aerospike cluster image.
+  - After few nodes are upgraded by doing the rolling restart of those nodes, you change your mind and want to roll back to the previous image.
+
+Steps to follow:
+  - change the `spec.image` field in the aerocluster CR to the new image
+  - Apply the config using `kubectl apply -f workshop/aerospike_cluster.yaml` 
+  - Wait for few nodes to be upgraded
+  - change the `spec.image` field in the aerocluster CR to the old image. Here, the cluster should just do the rolling restart of nodes, Which were upgraded in previous steps with new image. It will not touch the nodes, which  already have the old image
+  - Apply the config using `kubectl apply -f workshop/aerospike_cluster.yaml` 
+
 ## **Update config**
 
 Add an in-memory namespace `bar`. 
@@ -633,7 +640,7 @@ metadata:
   namespace: aerospike
 spec:
   size: 2
-  image: aerospike/aerospike-server-enterprise:5.5.0.3
+
   aerospikeConfig:
     namespaces:
       - name: bar
@@ -664,40 +671,6 @@ aerocluster-0-2                                  0/2     Terminating   0        
 .
 .
 ```
-## **Rolling back partial Upgrade/Config update or scale down**
-
-Use case:
-  - Want to remove in-memory namespace `bar`.
-  - After it is removed from a few node's configs by doing a rolling restart of those nodes, you change your mind and want to roll back to the previous config.
-
-Steps to follow:
-  - Remove namespace `bar` from the config
-  - Apply the config using `kubectl apply -f workshop/aerospike_cluster.yaml` 
-  - Wait for few nodes to restart
-  - Add the namespace `bar` again in the config. Here, the cluster should just do the rolling restart of nodes, where namespace was removed in previous steps. It will not touch the nodes, which  already have the config with namespace `bar`
-  - Apply the config using `kubectl apply -f workshop/aerospike_cluster.yaml` 
-
-
-```yaml
-apiVersion: aerospike.com/v1alpha1
-kind: AerospikeCluster
-metadata:
-  name: aerocluster
-  namespace: aerospike
-spec:
-  size: 2
-  image: aerospike/aerospike-server-enterprise:5.5.0.3
-  aerospikeConfig:
-    namespaces:
-      - name: bar
-        memory-size: 1000000000
-        replication-factor: 2
-        storage-engine:
-          type: memory
-  .
-  .
-```
-
 ## **Rack management**
 
 ### **Add/Remove racks**
@@ -712,9 +685,9 @@ Add the Rack-specific config for the Aerospike cluster in the CR file.
     #  Check this zone for your k8s cluster
     #  Zone can not be updated 
       - id: 1
-        # zone: us-central1-b
+        # zone: us-west2-a
       - id: 2
-        # zone: us-central1-a
+        # zone: us-west2-b
 .
 .
 ```
@@ -1093,7 +1066,7 @@ kubectl run -it --rm --restart=Never aerospike-tool -n aerospike --image=aerospi
 
 **Add data in source cluster**
 ```sh
-kubectl run -it --rm --restart=Never aerospike-tool -n aerospike --image=aerospike/aerospike-tools:latest -- asbenchmark -h aeroclustersrc -U admin -P admin123 -k 1000 -o I -w I
+kubectl run -it --rm --restart=Never aerospike-tool -n aerospike --image=aerospike/aerospike-tools:latest -- asbenchmark -h aeroclustersrc -U admin -P admin123 -k 1000 -o I -w RU,80
 
 
 kubectl run -it --rm --restart=Never aerospike-tool -n aerospike --image=aerospike/aerospike-tools:latest -- aql -h aeroclustersrc -U admin -P admin123
