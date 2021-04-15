@@ -19,7 +19,7 @@ This repo provides step by step guide to deploy aerospike-kubernetes-operator an
   * [**Scale up**](#scale-up)
   * [**Scale down**](#scale-down)
   * [**Upgrade**](#upgrade)
-  * [**Rolling back partial Upgrade or Config update**](#--rolling-back-partial-upgrade-or-config-update--)
+  * [**Rolling back partial Upgrade or Config update**](#rolling-back-partial-upgrade-or-config-update)
   * [**Update config**](#update-config)
 
   * [**Rack management**](#rack-management)
