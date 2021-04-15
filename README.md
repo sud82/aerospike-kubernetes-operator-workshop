@@ -19,7 +19,7 @@ This repo provides step by step guide to deploy aerospike-kubernetes-operator an
   * [**Scale up**](#scale-up)
   * [**Scale down**](#scale-down)
   * [**Upgrade**](#upgrade)
-  * [**Rolling back partial Upgrade, Config update or scale down**](#--rolling-back-partial-upgrade--config-update-or-scale-down--)
+  * [**Rolling back partial Upgrade or Config update**](#--rolling-back-partial-upgrade-or-config-update--)
   * [**Update config**](#update-config)
 
   * [**Rack management**](#rack-management)
@@ -447,8 +447,6 @@ global:
 
 ```
 
-
-
 ```sh
 # Deploy the helm chart
 helm install aerospike-monitoring-stack summit-demo/aerospike-monitoring-stack \
@@ -614,7 +612,7 @@ Status:
       Service Port:  31312
 ```
 
-## **Rolling back partial Upgrade/Config update or scale down**
+## **Rolling back partial Upgrade or Config update**
 
 Use case:
   - Want to upgrade aerospike cluster image.
